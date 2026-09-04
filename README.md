@@ -74,40 +74,6 @@ npm run server   # backend on :3001
 npm run dev      # frontend on :5173
 ```
 
-## Deploying to Vercel
-
-The frontend and backend deploy together as a single Vercel project: the
-React app builds to static files, and `server/app.js` (the same Express app
-used locally) runs as a serverless function at `api/index.js`. `vercel.json`
-rewrites any `/api/*` request to that function, so the frontend keeps calling
-relative `/api/...` paths in production exactly like it does in dev — no
-separate backend URL or CORS setup needed.
-
-1. Push this repo to a GitHub/GitLab/Bitbucket repo (or use the Vercel CLI's
-   `vercel` command to deploy without git).
-2. In the Vercel dashboard, import the repo as a new project. It will pick up
-   `vercel.json` automatically (build command, output directory, install
-   command, and the API function's 30s timeout are already configured there).
-3. Add an environment variable in the Vercel project settings (Settings →
-   Environment Variables): `DATABASE_URL`, set to your Neon connection
-   string, for the Production (and Preview, if you want preview deploys to
-   work) environments. This is the same value you put in `server/.env`
-   locally — `.env` files aren't deployed, so this has to be set in the
-   dashboard.
-4. Deploy. Once it's live, the schema and any data migration
-   (`npm run migrate:json --prefix server`) only need to be run once against
-   your Neon database — they aren't part of the deploy itself.
-
-Notes:
-- Use Neon's **pooled** connection string (hostname contains `-pooler`) for
-  `DATABASE_URL` in Vercel — serverless functions can spin up many concurrent
-  instances, and the pooled endpoint avoids exhausting Postgres's connection
-  limit. Neon's default connection string from the dashboard is already the
-  pooled one.
-- Recipe scraping fetches a third-party page inside the function, which can
-  be slow on some sites. `vercel.json` raises the function timeout to 30s;
-  adjust the `maxDuration` there if your Vercel plan allows more (or less).
-
 ## How recipe parsing works
 
 When you submit a link, the backend fetches the page and looks for the
