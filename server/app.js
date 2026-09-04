@@ -5,6 +5,7 @@ import {
   getRecipeById,
   findRecipeByUrl,
   insertRecipe,
+  updateRecipeTitle,
   deleteRecipeById,
   UNIQUE_VIOLATION,
 } from './db.js';
@@ -73,6 +74,21 @@ app.post('/api/recipes', async (req, res, next) => {
     }
 
     res.status(201).json(recipe);
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.patch('/api/recipes/:id', async (req, res, next) => {
+  try {
+    const { title } = req.body || {};
+    if (!title || typeof title !== 'string' || !title.trim()) {
+      return res.status(400).json({ error: 'title is required' });
+    }
+
+    const recipe = await updateRecipeTitle(req.params.id, title.trim());
+    if (!recipe) return res.status(404).json({ error: 'Recipe not found' });
+    res.json(recipe);
   } catch (err) {
     next(err);
   }

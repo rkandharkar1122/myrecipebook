@@ -55,11 +55,35 @@ function RecipeDetail({ recipe }) {
 
           <div className="tab-panel" role="tabpanel">
             {activeTab === 'ingredients' && (
-              <ul className="ingredients">
-                {recipe.ingredients.map((item, i) => (
-                  <li key={i}>{item}</li>
-                ))}
-              </ul>
+              <>
+                {(recipe.prepTime || recipe.cookTime || recipe.servings) && (
+                  <dl className="recipe-meta">
+                    {recipe.prepTime && (
+                      <div className="recipe-meta-item">
+                        <dt>Prep time</dt>
+                        <dd>{recipe.prepTime}</dd>
+                      </div>
+                    )}
+                    {recipe.cookTime && (
+                      <div className="recipe-meta-item">
+                        <dt>Cook time</dt>
+                        <dd>{recipe.cookTime}</dd>
+                      </div>
+                    )}
+                    {recipe.servings && (
+                      <div className="recipe-meta-item">
+                        <dt>Servings</dt>
+                        <dd>{recipe.servings}</dd>
+                      </div>
+                    )}
+                  </dl>
+                )}
+                <ul className="ingredients">
+                  {recipe.ingredients.map((item, i) => (
+                    <li key={i}>{item}</li>
+                  ))}
+                </ul>
+              </>
             )}
             {activeTab === 'steps' && (
               <ol className="steps">

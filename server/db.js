@@ -15,6 +15,9 @@ function toRecipe(row) {
     addedAt: row.added_at.toISOString(),
     title: row.title,
     image: row.image,
+    prepTime: row.prep_time,
+    cookTime: row.cook_time,
+    servings: row.servings,
     ingredients: row.ingredients,
     steps: row.steps,
     nutrition: row.nutrition,
@@ -39,13 +42,16 @@ export async function findRecipeByUrl(sourceUrl) {
 
 export async function insertRecipe(recipe) {
   const { rows } = await pool.query(
-    `INSERT INTO recipes (source_url, title, image, ingredients, steps, nutrition, video_url)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `INSERT INTO recipes (source_url, title, image, prep_time, cook_time, servings, ingredients, steps, nutrition, video_url)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      RETURNING *`,
     [
       recipe.sourceUrl,
       recipe.title,
       recipe.image,
+      recipe.prepTime,
+      recipe.cookTime,
+      recipe.servings,
       JSON.stringify(recipe.ingredients),
       JSON.stringify(recipe.steps),
       recipe.nutrition ? JSON.stringify(recipe.nutrition) : null,
@@ -53,6 +59,14 @@ export async function insertRecipe(recipe) {
     ]
   );
   return toRecipe(rows[0]);
+}
+
+export async function updateRecipeTitle(id, title) {
+  const { rows } = await pool.query(
+    'UPDATE recipes SET title = $1 WHERE id = $2 RETURNING *',
+    [title, id]
+  );
+  return rows[0] ? toRecipe(rows[0]) : null;
 }
 
 export async function deleteRecipeById(id) {

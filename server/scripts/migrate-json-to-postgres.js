@@ -22,14 +22,17 @@ async function main() {
 
   for (const recipe of recipes) {
     const { rowCount } = await pool.query(
-      `INSERT INTO recipes (source_url, added_at, title, image, ingredients, steps, nutrition, video_url)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO recipes (source_url, added_at, title, image, prep_time, cook_time, servings, ingredients, steps, nutrition, video_url)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        ON CONFLICT (source_url) DO NOTHING`,
       [
         recipe.sourceUrl,
         recipe.addedAt,
         recipe.title,
         recipe.image,
+        recipe.prepTime ?? null,
+        recipe.cookTime ?? null,
+        recipe.servings ?? null,
         JSON.stringify(recipe.ingredients ?? []),
         JSON.stringify(recipe.steps ?? []),
         recipe.nutrition ? JSON.stringify(recipe.nutrition) : null,

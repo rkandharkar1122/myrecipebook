@@ -154,6 +154,30 @@ function normalizeNutrition(raw) {
   return Object.keys(nutrition).length ? nutrition : null;
 }
 
+function formatDuration(iso) {
+  if (!iso || typeof iso !== 'string') return null;
+  const match = /^P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/.exec(
+    iso.trim()
+  );
+  if (!match) return null;
+  const [, years, months, weeks, days, hours, minutes] = match;
+  const parts = [];
+  if (years) parts.push(`${years}y`);
+  if (months) parts.push(`${months}mo`);
+  if (weeks) parts.push(`${weeks}w`);
+  if (days) parts.push(`${days}d`);
+  if (hours) parts.push(`${hours} hr`);
+  if (minutes) parts.push(`${minutes} min`);
+  return parts.length ? parts.join(' ') : null;
+}
+
+function normalizeYield(raw) {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof value === 'number') return String(value);
+  if (typeof value === 'string') return decodeEntities(value.trim()) || null;
+  return null;
+}
+
 function extractImage(node, $) {
   const img = node.image;
   if (img) {
@@ -190,6 +214,9 @@ function normalizeJsonLdRecipe(node, $) {
   return {
     title: textOf(node.name) || $('title').first().text().trim(),
     image: extractImage(node, $),
+    prepTime: formatDuration(node.prepTime),
+    cookTime: formatDuration(node.cookTime),
+    servings: normalizeYield(node.recipeYield || node.yield),
     ingredients: normalizeIngredients(node.recipeIngredient || node.ingredients),
     steps: normalizeInstructions(node.recipeInstructions),
     nutrition: normalizeNutrition(node.nutrition),
@@ -214,6 +241,18 @@ function collectListText($, pattern) {
   return [...new Set(results)];
 }
 
+function findFirstText($, pattern, maxLength = 60) {
+  let result = null;
+  $('[class]').each((_, el) => {
+    if (result) return;
+    const className = $(el).attr('class') || '';
+    if (!pattern.test(className)) return;
+    const text = $(el).text().trim().replace(/\s+/g, ' ');
+    if (text && text.length <= maxLength) result = text;
+  });
+  return result;
+}
+
 function extractFallbackRecipe($, url) {
   const title =
     $('meta[property="og:title"]').attr('content') ||
@@ -224,6 +263,9 @@ function extractFallbackRecipe($, url) {
   return {
     title,
     image: $('meta[property="og:image"]').attr('content') || null,
+    prepTime: findFirstText($, /prep-?time/i),
+    cookTime: findFirstText($, /cook-?time/i),
+    servings: findFirstText($, /(recipe-?yield|servings)/i),
     ingredients: collectListText($, /ingredient/i),
     steps: collectListText($, /instruction|direction|method|steps?\b/i),
     nutrition: null,

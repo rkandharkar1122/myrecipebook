@@ -27,6 +27,14 @@ export function addRecipe(url) {
   }).then(handleResponse);
 }
 
+export function renameRecipe(id, title) {
+  return fetch(`${API_BASE}/recipes/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title }),
+  }).then(handleResponse);
+}
+
 export function deleteRecipe(id) {
   return fetch(`${API_BASE}/recipes/${id}`, { method: 'DELETE' }).then(handleResponse);
 }

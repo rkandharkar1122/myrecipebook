@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import Inbox from './components/Inbox.jsx';
 import RecipeList from './components/RecipeList.jsx';
 import RecipeDetail from './components/RecipeDetail.jsx';
-import { fetchRecipes, addRecipe, deleteRecipe } from './api.js';
+import RecipeIndex from './components/RecipeIndex.jsx';
+import { fetchRecipes, addRecipe, renameRecipe, deleteRecipe } from './api.js';
 import './App.css';
 
 function App() {
@@ -10,6 +11,7 @@ function App() {
   const [selectedId, setSelectedId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
+  const [view, setView] = useState('library');
 
   useEffect(() => {
     fetchRecipes()
@@ -27,10 +29,20 @@ function App() {
     setSelectedId(recipe.id);
   };
 
+  const handleRename = async (id, title) => {
+    const updated = await renameRecipe(id, title);
+    setRecipes((prev) => prev.map((r) => (r.id === id ? updated : r)));
+  };
+
   const handleDelete = async (id) => {
     await deleteRecipe(id);
     setRecipes((prev) => prev.filter((r) => r.id !== id));
     setSelectedId((current) => (current === id ? null : current));
+  };
+
+  const handleSelectFromIndex = (id) => {
+    setSelectedId(id);
+    setView('library');
   };
 
   const selectedRecipe = recipes.find((r) => r.id === selectedId) || null;
@@ -43,30 +55,44 @@ function App() {
         <Inbox onAdd={handleAdd} />
       </header>
 
-      <main className="app-main">
-        <aside className="app-sidebar">
-          {loading ? (
-            <p className="empty-state">Loading recipes…</p>
-          ) : loadError ? (
-            <p className="inbox-error">{loadError}</p>
-          ) : (
-            <RecipeList
-              recipes={recipes}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              onDelete={handleDelete}
-            />
-          )}
-        </aside>
+      <nav className="view-nav">
+        <button type="button" className={view === 'library' ? 'active' : ''} onClick={() => setView('library')}>
+          My Recipes
+        </button>
+        <button type="button" className={view === 'index' ? 'active' : ''} onClick={() => setView('index')}>
+          Index
+        </button>
+      </nav>
 
-        <section className="app-content">
-          {selectedRecipe ? (
-            <RecipeDetail key={selectedRecipe.id} recipe={selectedRecipe} />
-          ) : (
-            <p className="empty-state">Select a recipe to see the details.</p>
-          )}
-        </section>
-      </main>
+      {view === 'index' ? (
+        <RecipeIndex recipes={recipes} onSelect={handleSelectFromIndex} />
+      ) : (
+        <main className="app-main">
+          <aside className="app-sidebar">
+            {loading ? (
+              <p className="empty-state">Loading recipes…</p>
+            ) : loadError ? (
+              <p className="inbox-error">{loadError}</p>
+            ) : (
+              <RecipeList
+                recipes={recipes}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+                onRename={handleRename}
+                onDelete={handleDelete}
+              />
+            )}
+          </aside>
+
+          <section className="app-content">
+            {selectedRecipe ? (
+              <RecipeDetail key={selectedRecipe.id} recipe={selectedRecipe} />
+            ) : (
+              <p className="empty-state">Select a recipe to see the details.</p>
+            )}
+          </section>
+        </main>
+      )}
     </div>
   );
 }
