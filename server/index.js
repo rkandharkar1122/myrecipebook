@@ -1,4 +1,7 @@
 import 'dotenv/config';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import cors from 'cors';
 import {
@@ -14,9 +17,14 @@ import { scrapeRecipe } from './scraper.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const distDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist');
 
 app.use(cors());
 app.use(express.json());
+
+app.get('/healthz', (req, res) => {
+  res.json({ ok: true });
+});
 
 app.get('/api/recipes', async (req, res, next) => {
   try {
@@ -105,6 +113,16 @@ app.delete('/api/recipes/:id', async (req, res, next) => {
     next(err);
   }
 });
+
+// Serve the built frontend (present in the container image; absent in local
+// API-only dev, where Vite serves the SPA instead).
+if (fs.existsSync(distDir)) {
+  app.use(express.static(distDir));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api/')) return next();
+    res.sendFile(path.join(distDir, 'index.html'));
+  });
+}
 
 app.use((err, req, res, next) => {
   console.error(err);

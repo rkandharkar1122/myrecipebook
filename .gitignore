@@ -4,3 +4,6 @@ dist
 server/.env
 .DS_Store
 .claude/settings.local.json
+
+# Kubernetes secret with the real DATABASE_URL (create from k8s/secret.example.yaml)
+k8s/secret.yaml

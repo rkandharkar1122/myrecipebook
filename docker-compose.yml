@@ -1,0 +1,12 @@
+services:
+  app:
+    build: .
+    image: recipebook:local
+    ports:
+      - "3001:3001"
+    env_file:
+      - server/.env          # provides DATABASE_URL
+    environment:
+      - PORT=3001
+      - NODE_ENV=production
+    restart: unless-stopped
