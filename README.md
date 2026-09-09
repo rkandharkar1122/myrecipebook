@@ -12,7 +12,7 @@ through someone's life story to get to the recipe.
 
 ## Prerequisites
 
-- Node.js 18+ and npm
+- Node.js 26.7.0 (see `.nvmrc` — run `nvm use`) and npm
 - A free [Neon](https://neon.tech) account (or any Postgres instance)
 
 ## Setup
@@ -100,3 +100,83 @@ npm run build    # production build of the frontend
 npm run lint     # eslint
 npm run preview  # preview the production build
 ```
+
+## Deploy to AWS EKS
+
+A single Docker image bundles the built SPA and the Express API (Express serves
+`dist/` and `/api/*` on the same origin). Terraform stands up the cluster and its
+supporting infrastructure; the image build and app rollout are manual `kubectl`
+steps.
+
+- `Dockerfile` — multi-stage build (Vite build → Node 26 runtime).
+- `infra/terraform/` — VPC (single NAT gateway), EKS + one `t3.small` managed
+  node group, ECR repo, and the AWS Load Balancer Controller (Helm + IRSA).
+- `k8s/` — Namespace, Deployment, Service, and an ALB `Ingress`, wired with
+  `kustomize`.
+
+The database stays on **Neon**; its connection string is supplied as a
+Kubernetes Secret (`recipebook-db`), never baked into the image or committed.
+
+### Prerequisites
+
+AWS CLI (authenticated), `terraform` >= 1.6, `kubectl`, `docker`, and the Neon
+`DATABASE_URL` for a database that already has `server/db/schema.sql` applied.
+
+### 1. Provision infrastructure (~15–20 min)
+
+```bash
+cd infra/terraform
+terraform init
+terraform apply
+```
+
+### 2. Point kubectl at the cluster and confirm the ALB controller is up
+
+```bash
+aws eks update-kubeconfig --region us-east-1 --name recipebook
+kubectl -n kube-system rollout status deploy/aws-load-balancer-controller
+```
+
+### 3. Build and push the image
+
+EKS nodes are x86_64, so build for `linux/amd64` even from an Apple Silicon Mac.
+
+```bash
+ECR=$(terraform -chdir=infra/terraform output -raw ecr_repository_url)
+aws ecr get-login-password --region us-east-1 \
+  | docker login --username AWS --password-stdin "${ECR%/*}"
+docker build --platform linux/amd64 -t "$ECR:v1" .
+docker push "$ECR:v1"
+```
+
+### 4. Create the namespace and the database Secret
+
+```bash
+kubectl apply -f k8s/namespace.yaml
+kubectl -n recipebook create secret generic recipebook-db \
+  --from-literal=DATABASE_URL='postgresql://USER:PASS@HOST-pooler.REGION.aws.neon.tech/neondb?sslmode=require'
+```
+
+### 5. Deploy
+
+Set the image in `k8s/kustomization.yaml` (`images[0].newName` → the ECR repo
+URL, `newTag` → `v1`), then:
+
+```bash
+kubectl apply -k k8s/
+kubectl -n recipebook rollout status deploy/recipebook
+kubectl -n recipebook get ingress recipebook -w   # wait for the ADDRESS (ALB DNS)
+```
+
+Open `http://<alb-dns>/` in a browser.
+
+### Teardown
+
+```bash
+kubectl delete -k k8s/          # removes the Ingress first, so the ALB is deleted
+cd infra/terraform && terraform destroy
+```
+
+Deleting the `Ingress` before `terraform destroy` matters — an ALB left behind by
+the controller blocks VPC deletion. Roughly **$4–6/day** while the cluster runs
+(EKS control plane, one node, the NAT gateway, and the ALB).
