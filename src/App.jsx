@@ -45,6 +45,11 @@ function App() {
     setView('library');
   };
 
+  const handleAdaptationSaved = (recipe) => {
+    setRecipes((prev) => [...prev, recipe]);
+    setSelectedId(recipe.id);
+  };
+
   const selectedRecipe = recipes.find((r) => r.id === selectedId) || null;
 
   return (
@@ -86,7 +91,11 @@ function App() {
 
           <section className="app-content">
             {selectedRecipe ? (
-              <RecipeDetail key={selectedRecipe.id} recipe={selectedRecipe} />
+              <RecipeDetail
+                key={selectedRecipe.id}
+                recipe={selectedRecipe}
+                onAdaptationSaved={handleAdaptationSaved}
+              />
             ) : (
               <p className="empty-state">Select a recipe to see the details.</p>
             )}

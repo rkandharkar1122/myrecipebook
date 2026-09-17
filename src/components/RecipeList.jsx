@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 function hostnameOf(url) {
+  if (!url) return 'adapted recipe';
   try {
     return new URL(url).hostname.replace(/^www\./, '');
   } catch {

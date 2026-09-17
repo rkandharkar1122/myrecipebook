@@ -35,6 +35,10 @@ spec:
           env:
             - name: PORT
               value: "3001"
+            - name: AWS_REGION
+              value: "us-east-1"
+            - name: BEDROCK_MODEL_ID
+              value: "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
           envFrom:
             - secretRef:
                 name: recipebook-db

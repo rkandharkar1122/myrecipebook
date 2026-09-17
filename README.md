@@ -5,15 +5,20 @@ nutritional info, and video (when available) so you don't have to scroll
 through someone's life story to get to the recipe.
 
 - **Frontend**: React (Vite) — an inbox to submit links, a list of saved
-  recipes, and a tabbed detail view (Ingredients / Steps / Nutrition).
+  recipes, a tabbed detail view (Ingredients / Steps / Nutrition), and a
+  per-recipe "Adapt" tab that rewrites a recipe for dietary restrictions.
 - **Backend**: Express API that fetches a submitted URL, parses it for
-  recipe data, and stores the result.
+  recipe data, stores the result, and proxies the adaptation chat to
+  Amazon Bedrock.
 - **Storage**: PostgreSQL, hosted for free on [Neon](https://neon.tech).
 
 ## Prerequisites
 
 - Node.js 26.7.0 (see `.nvmrc` — run `nvm use`) and npm
 - A free [Neon](https://neon.tech) account (or any Postgres instance)
+- For the recipe-adaptation chat: AWS credentials and access to a Claude
+  model on [Amazon Bedrock](https://console.aws.amazon.com/bedrock/) (request
+  model access in the console, in the region you set as `AWS_REGION`)
 
 ## Setup
 
@@ -34,7 +39,12 @@ through someone's life story to get to the recipe.
    cp server/.env.example server/.env
    ```
 
-   and paste your connection string into `server/.env` as `DATABASE_URL`.
+   - Paste your connection string into `server/.env` as `DATABASE_URL`.
+   - For the adaptation chat, set `AWS_REGION` and `BEDROCK_MODEL_ID`, and
+     provide AWS credentials by any standard method (env vars, `aws sso login`,
+     `~/.aws/credentials`, …). The identity needs `bedrock:InvokeModel` on the
+     model in `BEDROCK_MODEL_ID`. The chat panel is the only feature that needs
+     this — the rest of the app runs without it.
 
 4. Create the `recipes` table:
 
@@ -44,6 +54,13 @@ through someone's life story to get to the recipe.
 
    (No `psql` installed? Paste the contents of `server/db/schema.sql` into
    the Neon dashboard's SQL editor instead.)
+
+   If you set the database up before the adaptation chat existed, apply the
+   migration too:
+
+   ```bash
+   psql "$DATABASE_URL" -f server/db/migrations/001_derived_recipes.sql
+   ```
 
 5. If you have existing recipes in `server/data/recipes.json` from an earlier
    version of the app, migrate them into Postgres (safe to re-run — it skips
@@ -84,14 +101,32 @@ for elements whose class names suggest ingredients/instructions and any
 Open Graph image/video tags. Sites with aggressive bot protection (e.g.
 Cloudflare challenges) may fail to fetch.
 
+## Recipe adaptation chat
+
+Each recipe's detail view has an **"Adapt"** tab alongside Ingredients / Steps /
+Nutrition. Describe a restriction ("make it vegan", "no nuts, dairy-free", "lower
+sodium") and the backend sends the recipe plus your message to a Claude model on
+Amazon Bedrock (via the Converse API in `server/bedrock.js`). The model replies in
+the tab and, once it has a full rewrite, returns a structured recipe you can
+**save as a new recipe** — stored with no `source_url` and a `derived_from`
+pointer to the original. Conversations are not persisted; they reset when you
+switch recipes.
+
+Configure with `AWS_REGION` and `BEDROCK_MODEL_ID` (see Setup). If credentials
+or model access are missing, the chat endpoint returns `502` and the rest of
+the app is unaffected.
+
 ## API
 
-| Method | Route              | Description                          |
-| ------ | ------------------ | ------------------------------------ |
-| GET    | `/api/recipes`     | List all saved recipes               |
-| POST   | `/api/recipes`     | Add a recipe from `{ "url": "..." }` |
-| GET    | `/api/recipes/:id` | Get a single recipe                  |
-| DELETE | `/api/recipes/:id` | Remove a recipe                      |
+| Method | Route                        | Description                                        |
+| ------ | ---------------------------- | ------------------------------------------------- |
+| GET    | `/api/recipes`              | List all saved recipes                            |
+| POST   | `/api/recipes`              | Add a recipe from `{ "url": "..." }`              |
+| GET    | `/api/recipes/:id`          | Get a single recipe                               |
+| PATCH  | `/api/recipes/:id`          | Rename a recipe from `{ "title": "..." }`         |
+| DELETE | `/api/recipes/:id`          | Remove a recipe                                   |
+| POST   | `/api/recipes/:id/adapt`    | Adaptation chat turn: `{ "messages": [...] }` → `{ reply, adaptedRecipe }` |
+| POST   | `/api/recipes/:id/adaptations` | Save an adapted recipe: `{ "recipe": {...} }` → the new recipe |
 
 ## Other scripts
 
@@ -116,6 +151,16 @@ steps.
 
 The database stays on **Neon**; its connection string is supplied as a
 Kubernetes Secret (`recipebook-db`), never baked into the image or committed.
+
+`k8s/deployment.yaml` sets `AWS_REGION` and `BEDROCK_MODEL_ID` for the
+adaptation chat. **The pods also need `bedrock:InvokeModel` permission** — this
+is not yet wired in `infra/terraform/`. Add an IAM policy granting
+`bedrock:InvokeModel` on the model ARN, create an IRSA role for it
+(`iam-role-for-service-accounts-eks`, as `alb_controller.tf` already does for
+the load-balancer controller), create a `ServiceAccount` annotated with that
+role ARN, and set `spec.template.spec.serviceAccountName` on the Deployment.
+Until then the chat endpoint returns `502` in-cluster while the rest of the app
+works.
 
 ### Prerequisites
 

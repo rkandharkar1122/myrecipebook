@@ -38,3 +38,19 @@ export function renameRecipe(id, title) {
 export function deleteRecipe(id) {
   return fetch(`${API_BASE}/recipes/${id}`, { method: 'DELETE' }).then(handleResponse);
 }
+
+export function sendRecipeAdaptChat(id, messages) {
+  return fetch(`${API_BASE}/recipes/${id}/adapt`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages }),
+  }).then(handleResponse);
+}
+
+export function saveAdaptedRecipe(id, recipe) {
+  return fetch(`${API_BASE}/recipes/${id}/adaptations`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ recipe }),
+  }).then(handleResponse);
+}

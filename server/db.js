@@ -22,6 +22,7 @@ function toRecipe(row) {
     steps: row.steps,
     nutrition: row.nutrition,
     videoUrl: row.video_url,
+    derivedFrom: row.derived_from ?? null,
   };
 }
 
@@ -56,6 +57,24 @@ export async function insertRecipe(recipe) {
       JSON.stringify(recipe.steps),
       recipe.nutrition ? JSON.stringify(recipe.nutrition) : null,
       recipe.videoUrl,
+    ]
+  );
+  return toRecipe(rows[0]);
+}
+
+export async function insertDerivedRecipe(recipe) {
+  const { rows } = await pool.query(
+    `INSERT INTO recipes (source_url, title, image, prep_time, cook_time, servings, ingredients, steps, nutrition, video_url, derived_from)
+     VALUES (NULL, $1, NULL, $2, $3, $4, $5, $6, NULL, NULL, $7)
+     RETURNING *`,
+    [
+      recipe.title,
+      recipe.prepTime,
+      recipe.cookTime,
+      recipe.servings,
+      JSON.stringify(recipe.ingredients),
+      JSON.stringify(recipe.steps),
+      recipe.derivedFrom,
     ]
   );
   return toRecipe(rows[0]);
